@@ -12,30 +12,42 @@ import os
 import requests
 import base64
 from audio_recorder_streamlit import audio_recorder
+import whisper
 
 # CRITICAL: This app does NOT use speech_recognition library
 # It uses alternative transcription methods compatible with Python 3.13
 
-def transcribe_with_web_api(audio_file_path, language='en-US'):
+def transcribe_with_open_source(audio_file_path, language='en-US'):
     """
-    Alternative transcription using Web Speech API approach
-    This is a placeholder for a working implementation
+    REAL transcription using OpenAI Whisper (100% open source)
+    Runs locally, no API keys needed, works on Streamlit Cloud
     """
-    # For now, return a demo transcription to show the app works
-    # In production, this would call a working speech API
-    
-    demo_transcriptions = {
-        'en-US': "Hello, this is a demo transcription. The audio file was processed successfully.",
-        'es-ES': "Hola, esta es una transcripción de demostración. El archivo de audio fue procesado exitosamente.",
-        'fr-FR': "Bonjour, ceci est une transcription de démonstration. Le fichier audio a été traité avec succès.",
-        'de-DE': "Hallo, das ist eine Demo-Transkription. Die Audiodatei wurde erfolgreich verarbeitet.",
-        'it-IT': "Ciao, questa è una trascrizione dimostrativa. Il file audio è stato elaborato con successo.",
-        'pt-PT': "Olá, esta é uma transcrição de demonstração. O arquivo de áudio foi processado com sucesso.",
-        'ru-RU': "Привет, это демонстрационная транскрипция. Аудиофайл был успешно обработан.",
-        'zh-CN': "你好，这是一个演示转录。音频文件已成功处理。",
-    }
-    
-    return demo_transcriptions.get(language, demo_transcriptions['en-US'])
+    try:
+        # Load Whisper model (will download once)
+        model = whisper.load_model("base")
+        
+        # Map language codes to Whisper format
+        lang_map = {
+            'en-US': 'en',
+            'en-GB': 'en', 
+            'es-ES': 'es',
+            'fr-FR': 'fr',
+            'de-DE': 'de',
+            'it-IT': 'it',
+            'pt-PT': 'pt',
+            'ru-RU': 'ru',
+            'zh-CN': 'zh'
+        }
+        
+        target_language = lang_map.get(language, 'en')
+        
+        # Transcribe audio using Whisper
+        result = model.transcribe(audio_file_path, language=target_language)
+        
+        return result["text"].strip()
+        
+    except Exception as e:
+        return f"Error transcribing audio: {e}"
 
 def main():
     """Main application"""
@@ -45,12 +57,12 @@ def main():
         layout="wide"
     )
     
-    st.title("🎤 Speech Recognition App - WITH RECORDING!")
-    st.markdown("**✅ Upload files OR record live audio - Python 3.13 compatible**")
+    st.title("🎤 Speech Recognition - REAL WHISPER TRANSCRIPTION!")
+    st.markdown("**✅ REAL audio transcription using OpenAI Whisper (open source)**")
     
     # Status indicator - VERY CLEAR
-    st.success("🚀 **RECORDING ENABLED** - Upload files OR record live audio!")
-    st.info("🎤 **NEW**: Live audio recording + file upload support")
+    st.success("🚀 **REAL WHISPER TRANSCRIPTION** - Processes your actual speech!")
+    st.info("🎤 **100% Open Source**: OpenAI Whisper running locally (no APIs needed)")
     
     # Initialize session state
     if 'transcriptions' not in st.session_state:
@@ -79,7 +91,7 @@ def main():
         )
     
     with col2:
-        st.metric("Recording Status", "🎤 ENABLED", delta="Live + Upload")
+        st.metric("Transcription Status", "🧠 WHISPER", delta="Real AI")
     
     # File upload
     uploaded_file = st.file_uploader(
@@ -120,7 +132,7 @@ def main():
         
         with col2:
             st.info(f"🌍 **Language:** {languages[selected_language]}")
-            st.info(f"🔧 **Method:** Alternative API (Recording)")
+            st.info(f"🔧 **Method:** Open Source SpeechRecognition")
         
         # Transcription button for recorded audio
         if st.button("🔄 **TRANSCRIBE RECORDING**", type="primary", use_container_width=True, key="transcribe_recording"):
@@ -131,11 +143,8 @@ def main():
                     tmp_file_path = tmp_file.name
                 
                 try:
-                    # Simulate processing time
-                    time.sleep(2)
-                    
-                    # Get transcription using alternative method
-                    text = transcribe_with_web_api(tmp_file_path, selected_language)
+                    # Get transcription using open source method
+                    text = transcribe_with_open_source(tmp_file_path, selected_language)
                     
                     if text:
                         st.success("🎉 **Recording Transcription Complete!**")
@@ -151,7 +160,7 @@ def main():
                             'filename': 'Live Recording',
                             'text': text,
                             'language': languages[selected_language],
-                            'method': 'Alternative API (Live Recording)'
+                            'method': 'OpenAI Whisper (Open Source)'
                         })
                         
                         # Download option
@@ -197,25 +206,22 @@ Method: Alternative API (Live Recording)
         
         with col2:
             st.info(f"🌍 **Language:** {languages[selected_language]}")
-            st.info(f"🔧 **Method:** Alternative API (No speech_recognition)")
+            st.info(f"🔧 **Method:** Open Source SpeechRecognition")
         
         # Audio player
         st.audio(uploaded_file)
         
         # Transcription button
         if st.button("🔄 **TRANSCRIBE FILE**", type="primary", use_container_width=True, key="transcribe_file"):
-            with st.spinner("🎤 Processing audio with Python 3.13 compatible method..."):
+            with st.spinner("🎤 Processing audio with open source method..."):
                 # Save uploaded file temporarily
                 with tempfile.NamedTemporaryFile(suffix=f".{uploaded_file.name.split('.')[-1]}", delete=False) as tmp_file:
                     tmp_file.write(uploaded_file.getvalue())
                     tmp_file_path = tmp_file.name
                 
                 try:
-                    # Simulate processing time
-                    time.sleep(2)
-                    
-                    # Get transcription using alternative method
-                    text = transcribe_with_web_api(tmp_file_path, selected_language)
+                    # Get transcription using open source method
+                    text = transcribe_with_open_source(tmp_file_path, selected_language)
                     
                     if text:
                         st.success("🎉 **Transcription Complete!**")
@@ -231,7 +237,7 @@ Method: Alternative API (Live Recording)
                             'filename': uploaded_file.name,
                             'text': text,
                             'language': languages[selected_language],
-                            'method': 'Alternative API (Compatible)'
+                            'method': 'OpenAI Whisper (Open Source)'
                         })
                         
                         # Download option
