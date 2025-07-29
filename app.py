@@ -1,13 +1,23 @@
 #!/usr/bin/env python3
 """
 Simple Speech Recognition App - Cloud Version
-Using only Google Speech API (free tier) for maximum compatibility
+Compatible with Python 3.13+ and Streamlit Cloud
 """
 
 import streamlit as st
 import tempfile
 import time
 import os
+
+def check_speech_recognition():
+    """Check if speech recognition is available"""
+    try:
+        import speech_recognition as sr
+        return True, sr, None
+    except ImportError as e:
+        return False, None, f"SpeechRecognition library not installed: {e}"
+    except Exception as e:
+        return False, None, f"Error loading SpeechRecognition: {e}"
 
 def main():
     """Main application"""
@@ -19,6 +29,21 @@ def main():
     
     st.title("🎤 Simple Speech Recognition")
     st.markdown("**Upload audio files and get transcriptions using Google's free API**")
+    
+    # Check if speech recognition is available
+    sr_available, sr_module, error_msg = check_speech_recognition()
+    
+    if not sr_available:
+        st.error("🚨 Speech Recognition Not Available")
+        st.error(f"Error: {error_msg}")
+        st.info("This is likely due to Python 3.13 compatibility issues. The speech_recognition library requires Python 3.11 or earlier.")
+        st.markdown("""
+        ### 🔧 To fix this issue:
+        1. The deployment needs Python 3.11 (check `runtime.txt`)
+        2. Contact the developer to update the deployment configuration
+        3. Alternative: Use a different speech recognition service
+        """)
+        st.stop()
     
     # Initialize session state
     if 'transcriptions' not in st.session_state:
@@ -56,19 +81,17 @@ def main():
         
         if st.button("🔄 Transcribe", type="primary"):
             try:
-                import speech_recognition as sr
-                
                 # Save uploaded file temporarily
                 with tempfile.NamedTemporaryFile(suffix=f".{uploaded_file.name.split('.')[-1]}", delete=False) as tmp_file:
                     tmp_file.write(uploaded_file.getvalue())
                     tmp_file_path = tmp_file.name
                 
                 # Initialize recognizer
-                recognizer = sr.Recognizer()
+                recognizer = sr_module.Recognizer()
                 
                 with st.spinner("🎤 Transcribing..."):
                     # Load audio file
-                    with sr.AudioFile(tmp_file_path) as source:
+                    with sr_module.AudioFile(tmp_file_path) as source:
                         recognizer.adjust_for_ambient_noise(source, duration=1)
                         audio_data = recognizer.record(source)
                     
@@ -102,11 +125,11 @@ def main():
                         else:
                             st.warning("⚠️ No speech detected")
                     
-                    except sr.RequestError as e:
+                    except sr_module.RequestError as e:
                         st.error(f"❌ API Error: {e}")
                         st.info("💡 Google's free API has daily limits. Try again later.")
                     
-                    except sr.UnknownValueError:
+                    except sr_module.UnknownValueError:
                         st.error("❌ Could not understand the audio")
                         st.info("💡 Try: Clear speech, reduce background noise, better audio quality")
                 
@@ -116,9 +139,6 @@ def main():
                 except:
                     pass
                     
-            except ImportError:
-                st.error("🚨 Speech Recognition library not available")
-                st.info("📋 This is a deployment configuration issue. The required libraries are not properly installed.")
             except Exception as e:
                 st.error(f"❌ Error: {e}")
     
