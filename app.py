@@ -2,6 +2,7 @@
 """
 Working Speech Recognition App - Alternative Implementation
 Uses web APIs instead of problematic speech_recognition library
+Version: 1.1 - Emergency Fix for Deployment
 """
 
 import streamlit as st
