@@ -1,0 +1,6 @@
+{
+  "api_keys": {
+    "google_credentials": "/path/to/your/google-service-account.json",
+    "deepgram_key": "your-deepgram-api-key-here"
+  }
+}

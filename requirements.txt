@@ -1,0 +1,5 @@
+streamlit==1.47.1
+SpeechRecognition==3.10.0
+pocketsphinx==5.0.0
+numpy
+pathlib

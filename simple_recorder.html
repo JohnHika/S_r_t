@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Browser Recording</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .record-btn {
+            background-color: #ff4757;
+            color: white;
+        }
+        .stop-btn {
+            background-color: #ff6b7a;
+            color: white;
+        }
+        .download-btn {
+            background-color: #3742fa;
+            color: white;
+        }
+        .clear-btn {
+            background-color: #747d8c;
+            color: white;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .recording {
+            background-color: #ff6b7a;
+            color: white;
+        }
+        .ready {
+            background-color: #2ed573;
+            color: white;
+        }
+        .stopped {
+            background-color: #ffa502;
+            color: white;
+        }
+        .info {
+            background-color: #3742fa;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .error {
+            background-color: #ff4757;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        audio {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .tips {
+            background-color: #f1f2f6;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Simple Browser Audio Recorder</h1>
+        <p>Record audio directly in your browser and download as WAV file!</p>
+        
+        <div id="status" class="status ready">🟢 Ready to record</div>
+        
+        <div class="controls">
+            <button id="recordBtn" class="record-btn">🔴 Start Recording</button>
+            <button id="stopBtn" class="stop-btn" disabled>⏹️ Stop Recording</button>
+            <button id="downloadBtn" class="download-btn" disabled>💾 Download WAV</button>
+            <button id="clearBtn" class="clear-btn">🗑️ Clear</button>
+        </div>
+        
+        <div id="audioContainer" style="display: none;">
+            <h3>📻 Recorded Audio:</h3>
+            <audio id="audioPlayback" controls></audio>
+        </div>
+        
+        <div class="info">
+            <h3>📝 Instructions:</h3>
+            <ol>
+                <li><strong>Click "Start Recording"</strong> - Allow microphone access when prompted</li>
+                <li><strong>Speak clearly</strong> - You'll see "Recording..." status</li>
+                <li><strong>Click "Stop Recording"</strong> - Recording will be processed</li>
+                <li><strong>Click "Download WAV"</strong> - Save the audio file</li>
+                <li><strong>Upload to Streamlit</strong> - Use the WAV file in the upload tab</li>
+            </ol>
+        </div>
+        
+        <div class="tips">
+            <h3>💡 Tips for Best Recording:</h3>
+            <ul>
+                <li>🔊 <strong>Speak clearly and at normal volume</strong></li>
+                <li>⏱️ <strong>Record for 3-10 seconds</strong> for best results</li>
+                <li>🔇 <strong>Minimize background noise</strong></li>
+                <li>🎤 <strong>Get close to your microphone</strong></li>
+                <li>🌐 <strong>Use Chrome/Firefox</strong> for best compatibility</li>
+            </ul>
+        </div>
+        
+        <div id="errorContainer" style="display: none;"></div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const status = document.getElementById('status');
+        const audioContainer = document.getElementById('audioContainer');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const errorContainer = document.getElementById('errorContainer');
+        
+        // Check if browser supports audio recording
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError('❌ Your browser does not support audio recording. Please use Chrome, Firefox, or Edge.');
+        }
+        
+        recordBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+        downloadBtn.addEventListener('click', downloadRecording);
+        clearBtn.addEventListener('click', clearRecording);
+        
+        async function startRecording() {
+            try {
+                hideError();
+                
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
+                
+                // Create MediaRecorder
+                const options = {
+                    mimeType: 'audio/webm',
+                    audioBitsPerSecond: 128000
+                };
+                
+                // Try different MIME types if webm not supported
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    if (MediaRecorder.isTypeSupported('audio/wav')) {
+                        options.mimeType = 'audio/wav';
+                    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                        options.mimeType = 'audio/mp4';
+                    } else {
+                        delete options.mimeType; // Use default
+                    }
+                }
+                
+                mediaRecorder = new MediaRecorder(stream, options);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = () => {
+                    // Create blob from chunks
+                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                    
+                    // Create audio URL and set up playback
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+                    audioContainer.style.display = 'block';
+                    
+                    // Enable download
+                    downloadBtn.disabled = false;
+                    downloadBtn.onclick = () => downloadBlob(audioBlob, 'recording.wav');
+                    
+                    updateStatus('🟡 Recording stopped - Ready to download', 'stopped');
+                    
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                // Start recording
+                mediaRecorder.start(100); // Collect data every 100ms
+                isRecording = true;
+                
+                recordBtn.disabled = true;
+                stopBtn.disabled = false;
+                downloadBtn.disabled = true;
+                
+                updateStatus('🔴 Recording... Speak now!', 'recording');
+                
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                if (error.name === 'NotAllowedError') {
+                    showError('❌ Microphone access denied. Please allow microphone access and try again.');
+                } else if (error.name === 'NotFoundError') {
+                    showError('❌ No microphone found. Please connect a microphone and try again.');
+                } else {
+                    showError(`❌ Error starting recording: ${error.message}`);
+                }
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+                
+                updateStatus('🔄 Processing recording...', 'stopped');
+            }
+        }
+        
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            updateStatus('✅ Download started! Check your Downloads folder', 'ready');
+        }
+        
+        function clearRecording() {
+            audioChunks = [];
+            audioContainer.style.display = 'none';
+            downloadBtn.disabled = true;
+            recordBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            updateStatus('🟢 Ready to record', 'ready');
+            hideError();
+        }
+        
+        function updateStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        function showError(message) {
+            errorContainer.innerHTML = `<div class="error">${message}</div>`;
+            errorContainer.style.display = 'block';
+        }
+        
+        function hideError() {
+            errorContainer.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
