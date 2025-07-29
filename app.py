@@ -2,7 +2,7 @@
 """
 Working Speech Recognition App - Alternative Implementation
 Uses web APIs instead of problematic speech_recognition library
-Version: 1.1 - Emergency Fix for Deployment
+Version: 1.2 - FORCE CACHE REFRESH - NO SPEECH_RECOGNITION IMPORT
 """
 
 import streamlit as st
@@ -11,6 +11,9 @@ import time
 import os
 import requests
 import base64
+
+# DEPLOYMENT VERIFICATION: This file should NOT import speech_recognition
+# If you see import speech_recognition anywhere, the deployment failed
 
 def transcribe_with_web_api(audio_file_path, language='en-US'):
     """
