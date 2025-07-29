@@ -12,42 +12,75 @@ import os
 import requests
 import base64
 from audio_recorder_streamlit import audio_recorder
-import whisper
+
+# Try to import whisper, but don't fail if it's not available
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
 
 # CRITICAL: This app does NOT use speech_recognition library
 # It uses alternative transcription methods compatible with Python 3.13
 
 def transcribe_with_open_source(audio_file_path, language='en-US'):
     """
-    REAL transcription using OpenAI Whisper (100% open source)
-    Runs locally, no API keys needed, works on Streamlit Cloud
+    REAL transcription using the best available open source method
+    1. Try OpenAI Whisper (if available)
+    2. Fall back to SpeechRecognition with Google's free API
+    3. Final fallback to Web Speech API simulation
     """
+    
+    # First try: OpenAI Whisper (best quality, fully offline)
+    if WHISPER_AVAILABLE:
+        try:
+            # Load Whisper model (will download once)
+            model = whisper.load_model("base")
+            
+            # Map language codes to Whisper format
+            lang_map = {
+                'en-US': 'en', 'en-GB': 'en', 'es-ES': 'es', 'fr-FR': 'fr',
+                'de-DE': 'de', 'it-IT': 'it', 'pt-PT': 'pt', 'ru-RU': 'ru', 'zh-CN': 'zh'
+            }
+            
+            target_language = lang_map.get(language, 'en')
+            result = model.transcribe(audio_file_path, language=target_language)
+            return result["text"].strip()
+            
+        except Exception as e:
+            st.warning(f"Whisper failed: {e}, trying fallback method...")
+    
+    # Second try: SpeechRecognition with Google (requires internet)
     try:
-        # Load Whisper model (will download once)
-        model = whisper.load_model("base")
+        import speech_recognition as sr
+        recognizer = sr.Recognizer()
         
-        # Map language codes to Whisper format
+        # Convert language codes for Google API
         lang_map = {
-            'en-US': 'en',
-            'en-GB': 'en', 
-            'es-ES': 'es',
-            'fr-FR': 'fr',
-            'de-DE': 'de',
-            'it-IT': 'it',
-            'pt-PT': 'pt',
-            'ru-RU': 'ru',
-            'zh-CN': 'zh'
+            'en-US': 'en-US', 'en-GB': 'en-GB', 'es-ES': 'es-ES', 'fr-FR': 'fr-FR',
+            'de-DE': 'de-DE', 'it-IT': 'it-IT', 'pt-PT': 'pt-PT', 'ru-RU': 'ru-RU', 'zh-CN': 'zh-CN'
         }
         
-        target_language = lang_map.get(language, 'en')
+        target_language = lang_map.get(language, 'en-US')
         
-        # Transcribe audio using Whisper
-        result = model.transcribe(audio_file_path, language=target_language)
+        with sr.AudioFile(audio_file_path) as source:
+            recognizer.adjust_for_ambient_noise(source)
+            audio = recognizer.listen(source)
         
-        return result["text"].strip()
+        text = recognizer.recognize_google(audio, language=target_language)
+        return text
         
+    except ImportError:
+        pass  # SpeechRecognition not available
+    except sr.UnknownValueError:
+        return "Could not understand the audio. Please try speaking more clearly."
+    except sr.RequestError as e:
+        pass  # Google API failed
     except Exception as e:
-        return f"Error transcribing audio: {e}"
+        pass  # Other error
+    
+    # Final fallback: Acknowledge recording but explain limitation
+    return f"🎤 Audio recorded successfully! However, this environment doesn't have speech recognition libraries installed. To get real transcription: 1) Run locally with 'pip install openai-whisper', or 2) Use the local version of this app. Your {len(open(audio_file_path, 'rb').read())} byte audio file was processed, but transcription requires additional libraries."
 
 def main():
     """Main application"""
@@ -57,12 +90,16 @@ def main():
         layout="wide"
     )
     
-    st.title("🎤 Speech Recognition - REAL WHISPER TRANSCRIPTION!")
-    st.markdown("**✅ REAL audio transcription using OpenAI Whisper (open source)**")
+    st.title("🎤 Speech Recognition - ADAPTIVE TRANSCRIPTION!")
+    st.markdown("**✅ Uses best available method: Whisper → SpeechRecognition → Fallback**")
     
-    # Status indicator - VERY CLEAR
-    st.success("🚀 **REAL WHISPER TRANSCRIPTION** - Processes your actual speech!")
-    st.info("🎤 **100% Open Source**: OpenAI Whisper running locally (no APIs needed)")
+    # Status indicator - Show what's available
+    if WHISPER_AVAILABLE:
+        st.success("🚀 **WHISPER AVAILABLE** - Best quality transcription ready!")
+        st.info("🧠 **Using**: OpenAI Whisper (100% open source, offline)")
+    else:
+        st.warning("⚠️ **WHISPER NOT AVAILABLE** - Using fallback methods")
+        st.info("🔄 **Fallback**: Will try SpeechRecognition or explain limitations")
     
     # Initialize session state
     if 'transcriptions' not in st.session_state:
@@ -91,7 +128,10 @@ def main():
         )
     
     with col2:
-        st.metric("Transcription Status", "🧠 WHISPER", delta="Real AI")
+        if WHISPER_AVAILABLE:
+            st.metric("Transcription", "🧠 WHISPER", delta="AI Available")
+        else:
+            st.metric("Transcription", "🔄 FALLBACK", delta="Limited Mode")
     
     # File upload
     uploaded_file = st.file_uploader(

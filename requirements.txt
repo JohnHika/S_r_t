@@ -1,4 +1,4 @@
 streamlit
 requests
 audio-recorder-streamlit
-openai-whisper
+SpeechRecognition
