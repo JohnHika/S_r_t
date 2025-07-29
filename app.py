@@ -11,6 +11,7 @@ import time
 import os
 import requests
 import base64
+from audio_recorder_streamlit import audio_recorder
 
 # CRITICAL: This app does NOT use speech_recognition library
 # It uses alternative transcription methods compatible with Python 3.13
@@ -44,12 +45,12 @@ def main():
         layout="wide"
     )
     
-    st.title("🎤 Speech Recognition App - DEPLOYMENT FIXED!")
-    st.markdown("**✅ NO speech_recognition imports - Python 3.13 compatible**")
+    st.title("🎤 Speech Recognition App - WITH RECORDING!")
+    st.markdown("**✅ Upload files OR record live audio - Python 3.13 compatible**")
     
     # Status indicator - VERY CLEAR
-    st.success("🚀 **DEPLOYMENT STATUS: WORKING** - No speech_recognition library conflicts!")
-    st.info("📊 **Python Version Compatibility**: Works with Python 3.13+ on Streamlit Cloud")
+    st.success("🚀 **RECORDING ENABLED** - Upload files OR record live audio!")
+    st.info("🎤 **NEW**: Live audio recording + file upload support")
     
     # Initialize session state
     if 'transcriptions' not in st.session_state:
@@ -78,7 +79,7 @@ def main():
         )
     
     with col2:
-        st.metric("Deployment Status", "✅ FIXED", delta="No Import Errors")
+        st.metric("Recording Status", "🎤 ENABLED", delta="Live + Upload")
     
     # File upload
     uploaded_file = st.file_uploader(
@@ -87,6 +88,106 @@ def main():
         help="Upload an audio file to transcribe"
     )
     
+    # Recording section
+    st.markdown("### 🎤 Or Record Audio Live")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        audio_bytes = audio_recorder(
+            text="Click to record",
+            recording_color="#e8b62c",
+            neutral_color="#6aa36f",
+            icon_name="microphone",
+            icon_size="2x",
+        )
+    
+    with col2:
+        if audio_bytes:
+            st.success("🎤 Audio recorded!")
+            st.audio(audio_bytes, format="audio/wav")
+    
+    # Process recorded audio if available
+    if audio_bytes:
+        st.markdown("---")
+        st.subheader("🎤 Process Recorded Audio")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.info("🎵 **Source:** Live Recording")
+            st.info(f"📊 **Size:** {len(audio_bytes):,} bytes")
+        
+        with col2:
+            st.info(f"🌍 **Language:** {languages[selected_language]}")
+            st.info(f"🔧 **Method:** Alternative API (Recording)")
+        
+        # Transcription button for recorded audio
+        if st.button("🔄 **TRANSCRIBE RECORDING**", type="primary", use_container_width=True, key="transcribe_recording"):
+            with st.spinner("🎤 Processing recorded audio..."):
+                # Save recorded audio temporarily
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+                    tmp_file.write(audio_bytes)
+                    tmp_file_path = tmp_file.name
+                
+                try:
+                    # Simulate processing time
+                    time.sleep(2)
+                    
+                    # Get transcription using alternative method
+                    text = transcribe_with_web_api(tmp_file_path, selected_language)
+                    
+                    if text:
+                        st.success("🎉 **Recording Transcription Complete!**")
+                        
+                        # Display result
+                        st.markdown("### 📝 Transcribed Text:")
+                        st.text_area("Recording Result:", value=text, height=100, disabled=True, key="recording_result")
+                        
+                        # Save to history
+                        timestamp = time.strftime("%H:%M:%S")
+                        st.session_state.transcriptions.append({
+                            'timestamp': timestamp,
+                            'filename': 'Live Recording',
+                            'text': text,
+                            'language': languages[selected_language],
+                            'method': 'Alternative API (Live Recording)'
+                        })
+                        
+                        # Download option
+                        download_content = f"""Speech Recognition Transcription
+Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}
+Source: Live Recording
+Language: {languages[selected_language]}
+Method: Alternative API (Live Recording)
+{'='*50}
+
+{text}"""
+                        
+                        st.download_button(
+                            "💾 **Download Recording Transcription**",
+                            data=download_content,
+                            file_name=f"recording_transcription_{timestamp.replace(':', '')}.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                            key="download_recording"
+                        )
+                        
+                        st.balloons()
+                    else:
+                        st.warning("⚠️ No speech detected in the recording")
+                
+                except Exception as e:
+                    st.error(f"❌ Error processing recording: {e}")
+                
+                finally:
+                    # Clean up temporary file
+                    try:
+                        os.unlink(tmp_file_path)
+                    except:
+                        pass
+    
+    # File upload processing (existing code)
     if uploaded_file is not None:
         col1, col2 = st.columns(2)
         
@@ -102,7 +203,7 @@ def main():
         st.audio(uploaded_file)
         
         # Transcription button
-        if st.button("🔄 **TRANSCRIBE**", type="primary", use_container_width=True):
+        if st.button("🔄 **TRANSCRIBE FILE**", type="primary", use_container_width=True, key="transcribe_file"):
             with st.spinner("🎤 Processing audio with Python 3.13 compatible method..."):
                 # Save uploaded file temporarily
                 with tempfile.NamedTemporaryFile(suffix=f".{uploaded_file.name.split('.')[-1]}", delete=False) as tmp_file:
@@ -121,7 +222,7 @@ def main():
                         
                         # Display result
                         st.markdown("### 📝 Transcribed Text:")
-                        st.text_area("Result:", value=text, height=100, disabled=True)
+                        st.text_area("File Result:", value=text, height=100, disabled=True, key="file_result")
                         
                         # Save to history
                         timestamp = time.strftime("%H:%M:%S")
@@ -144,11 +245,12 @@ Method: Alternative API (Python 3.13 Compatible)
 {text}"""
                         
                         st.download_button(
-                            "💾 **Download Transcription**",
+                            "💾 **Download File Transcription**",
                             data=download_content,
                             file_name=f"transcription_{timestamp.replace(':', '')}.txt",
                             mime="text/plain",
-                            use_container_width=True
+                            use_container_width=True,
+                            key="download_file"
                         )
                         
                         st.balloons()
